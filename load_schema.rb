@@ -30,11 +30,22 @@ class Schema
       json_schema = {
         name: name,
       }
-      if tag = details.delete('tag')
-        json_schema['tag'] = tag
+      json_schema['tag'] = details.delete('tag') if details.include? 'tag'
+      if details.include? 'blocks'
+        blocks = details.delete('blocks').map do |type, block_details|
+          limit = block_details.delete 'limit'
+          block_definition = {
+            name: type,
+            type: type,
+          }
+          block_definition['limit'] = limit if limit
+          block_definition['settings'] = build_settings(block_details)
+          block_definition
+        end
       end
       settings = build_settings details
       json_schema['settings'] = settings
+      json_schema['blocks'] = blocks if blocks
       [name, JSON.pretty_generate(json_schema)]
     end.to_h
   end
@@ -65,11 +76,20 @@ class Schema
 
   def build_settings settings_data
     settings_data.map do |name, details|
-      {
-        type: details.fetch('type'),
-        id: name,
-        label: name,
-      }
+      case details
+      when String
+        {
+          id: name,
+          type: details,
+          label: name,
+        }
+      when Hash
+        {
+          id: name,
+          **details,
+          label: name,
+        }
+      end
     end
   end
 end
