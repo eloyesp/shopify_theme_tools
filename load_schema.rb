@@ -3,6 +3,8 @@
 
 require 'yaml'
 require 'json'
+require 'active_support'
+require 'active_support/core_ext/string/inflections'
 
 # Yaml schema parser
 class Schema
@@ -81,13 +83,13 @@ class Schema
         {
           id: name,
           type: details,
-          label: name,
+          label: name.titleize,
         }
       when Hash
         {
           id: name,
           **details,
-          label: name,
+          label: name.titleize,
         }
       end
     end
