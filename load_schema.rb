@@ -98,11 +98,23 @@ end
 
 schema = Schema.new Psych.load_file('schema.yml')
 
-puts '# config/settings_schema.json'
-puts schema.config_settings
-puts
+File.write('config/settings_schema.json', schema.config_settings)
 
 schema.sections.each do |name, json_schema|
-  puts "# section/#{ name }.liquid"
-  puts json_schema
+  template_file = "sections/#{ name }.liquid"
+  if File.exist? template_file
+    original_template = File.read(template_file)
+  else
+    original_template = <<~TEMPLATE
+      #{ name }
+      {% schema %}
+      {% endschema %}
+    TEMPLATE
+  end
+  template = original_template.gsub(/{%\s?schema\s?%}.*{%\s?endschema\s?%}/m, <<~TEMPLATE.chomp)
+    {% schema %}
+    #{ json_schema }
+    {% endschema %}
+  TEMPLATE
+  File.write template_file, template unless template == original_template
 end
