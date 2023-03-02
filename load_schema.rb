@@ -30,24 +30,21 @@ class Schema
   def sections
     schema.fetch('sections').map do |name, details|
       json_schema = {
-        name: name,
+        name: name.titleize,
       }
-      json_schema['tag'] = details.delete('tag') if details.include? 'tag'
-      if details.include? 'blocks'
-        blocks = details.delete('blocks').map do |type, block_details|
-          limit = block_details.delete 'limit'
-          block_definition = {
-            name: type,
-            type: type,
-          }
-          block_definition['limit'] = limit if limit
-          block_definition['settings'] = build_settings(block_details)
-          block_definition
-        end
+      %w{ tag class limit max_blocks }.each do |attr|
+        json_schema[attr] = details.delete(attr) if details.include? attr
       end
+
+      blocks = parse_blocks details.delete('blocks')
+      presets = parse_presets details.delete('presets')
+      default = parse_single_preset details.delete('default')
       settings = build_settings details
+
       json_schema['settings'] = settings
       json_schema['blocks'] = blocks if blocks
+      json_schema['presets'] = presets if presets
+      json_schema['default'] = default if default
       [name, JSON.pretty_generate(json_schema)]
     end.to_h
   end
@@ -92,6 +89,47 @@ class Schema
           label: name.titleize,
         }
       end
+    end
+  end
+
+  def parse_blocks blocks
+    return nil unless blocks
+    blocks.map do |type, block_details|
+      limit = block_details.delete 'limit'
+      block_definition = {
+        name: type,
+        type: type,
+      }
+      block_definition['limit'] = limit if limit
+      block_definition['settings'] = build_settings(block_details)
+      block_definition
+    end
+  end
+
+  def parse_presets presets
+    return nil unless presets
+    presets.map do |name, preset|
+      details = parse_single_preset(preset)
+      { name: name.titleize, **details }
+    end
+  end
+
+  def parse_single_preset preset
+    return nil unless preset
+    blocks = parse_block_settings preset.delete('blocks')
+    {
+      blocks: blocks,
+      settings: preset,
+    }.compact
+  end
+
+  def parse_block_settings blocks
+    return nil unless blocks
+    blocks.map do |type, block_data|
+      {
+        type: type,
+        **block_data,
+      }
     end
   end
 end
