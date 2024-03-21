@@ -49,4 +49,4 @@ sections:
 ```
 
 With that in place, the `schema_load` tool, should get rid of writing the verbose JSON
-version.
+version, in this case more than 100 LoC.

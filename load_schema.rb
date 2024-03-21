@@ -83,7 +83,7 @@ class Schema
       end
       {
         name: name.titleize,
-        settings: details,
+        settings: details.presence,
         blocks: blocks,
       }.compact
     end
