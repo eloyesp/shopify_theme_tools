@@ -5,6 +5,7 @@ require 'yaml'
 require 'json'
 require 'active_support'
 require 'active_support/core_ext/string/inflections'
+require 'active_support/core_ext/object/blank'
 
 # Yaml schema parser
 class Schema
@@ -22,7 +23,7 @@ class Schema
   def config_settings
     JSON.pretty_generate [
       theme_info,
-      *categories,
+      *categories(schema.fetch('global_categories')),
     ]
   end
 
@@ -32,15 +33,11 @@ class Schema
       json_schema = {
         name: name.titleize,
       }
-      %w{ tag class limit max_blocks }.each do |attr|
-        json_schema[attr] = details.delete(attr) if details.include? attr
-      end
-
-      blocks = parse_blocks details.delete('blocks')
-      presets = parse_presets details.delete('presets')
-      default = parse_single_preset details.delete('default')
+      json_schema['tag'] = details.delete('tag') || 'section'
+      presets = build_presets(details.delete('presets')) if details.include? 'presets'
+      default = build_default(details.delete('default')) if details.include? 'default'
+      blocks = build_blocks(details.delete('blocks')) if details.include? 'blocks'
       settings = build_settings details
-
       json_schema['settings'] = settings
       json_schema['blocks'] = blocks if blocks
       json_schema['presets'] = presets if presets
@@ -63,14 +60,49 @@ class Schema
     }
   end
 
-  def categories
-    schema.fetch('categories').map do |category, settings_schema|
+  def categories categories
+    categories.map do |category, settings_schema|
       settings = build_settings settings_schema
       {
         name: category,
         settings: settings
       }
     end
+  end
+
+  def build_presets presets
+    presets.map do |name, details|
+      blocks = details.delete('blocks')
+      if blocks
+        blocks = blocks.map do |type, settings|
+          {
+            type: type,
+            settings: settings,
+          }.compact
+        end
+      end
+      {
+        name: name.titleize,
+        settings: details,
+        blocks: blocks,
+      }.compact
+    end
+  end
+
+  def build_default details
+    blocks = details.delete('blocks')
+    if blocks
+      blocks = blocks.map do |type, settings|
+        {
+          type: type,
+          settings: settings.presence,
+        }.compact
+      end
+    end
+    {
+      settings: details.presence,
+      blocks: blocks,
+    }.compact
   end
 
   def build_settings settings_data
@@ -83,63 +115,61 @@ class Schema
           label: name.titleize,
         }
       when Hash
-        {
-          id: name,
-          **details,
-          label: name.titleize,
-        }
+        options = build_options details.delete('options')
+        default_type = options.present? ? 'select' : 'text'
+        type = details.delete('type') || default_type
+        case type
+        when 'header'
+          {
+            type: type,
+            content: details['content'] || name.titleize,
+            info: details['info']
+          }
+        else
+          {
+            id: name,
+            type: type,
+            **details,
+            label: name.titleize,
+            options: options,
+          }
+        end.compact
       end
+    end.compact
+  end
+
+  def build_options options
+    return unless options.present?
+    options.map do |label, value|
+      value = label.underscore unless value.present?
+      {
+        value: value,
+        label: label.titleize,
+      }
     end
   end
 
-  def parse_blocks blocks
-    return nil unless blocks
+  def build_blocks blocks
     blocks.map do |type, block_details|
       limit = block_details.delete 'limit'
-      block_definition = {
-        name: type,
-        type: type,
-      }
-      block_definition['limit'] = limit if limit
-      block_definition['settings'] = build_settings(block_details)
-      block_definition
-    end
-  end
-
-  def parse_presets presets
-    return nil unless presets
-    presets.map do |name, preset|
-      details = parse_single_preset(preset)
-      { name: name.titleize, **details }
-    end
-  end
-
-  def parse_single_preset preset
-    return nil unless preset
-    blocks = parse_block_settings preset.delete('blocks')
-    {
-      blocks: blocks,
-      settings: preset,
-    }.compact
-  end
-
-  def parse_block_settings blocks
-    return nil unless blocks
-    blocks.map do |type, block_data|
       {
+        name: type.titleize,
         type: type,
-        **block_data,
-      }
+        limit: limit,
+        settings: build_settings(block_details),
+      }.compact
     end
   end
 end
 
 schema = Schema.new Psych.load_file('schema.yml')
+schema_file = 'config/settings_schema.json'
 
-File.write('config/settings_schema.json', schema.config_settings)
+File.write(schema_file, schema.config_settings)
+system('prettier', '-w', schema_file) or puts "Error on prettier"
 
 schema.sections.each do |name, json_schema|
-  template_file = "sections/#{ name }.liquid"
+  template_file = "sections/#{ name.dasherize }.liquid"
   if File.exist? template_file
     original_template = File.read(template_file)
   else
@@ -155,4 +185,5 @@ schema.sections.each do |name, json_schema|
     {% endschema %}
   TEMPLATE
   File.write template_file, template unless template == original_template
+  system('prettier', '-w', template_file) or puts "Error on prettier"
 end

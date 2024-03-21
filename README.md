@@ -22,15 +22,30 @@ theme:
   author: Eloy
   documentation: https://github.com/eloyesp/skeleton
   support: https://github.com/eloyesp/skeleton/issues
-categories:
+
+global_categories:
   name:
     setting:
       type: image_picker
+
 sections:
-  name:
+  image_with_text:
     tag: section
-    setting_name:
-      type: image_picker
+    image: image_picker
+    heading:
+      default: Sample
+    text: richtext
+    text_alignment:
+      options: [left, center, right]
+
+  carousel:
+    heading: text
+    blocks:
+      image:
+        image: image_picker
+    presets:
+      carousel:
+        blocks: [image, image, image]
 ```
 
 With that in place, the `schema_load` tool, should get rid of writing the verbose JSON
