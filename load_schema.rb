@@ -34,6 +34,7 @@ class Schema
         name: name.titleize,
       }
       json_schema['tag'] = details.delete('tag') || 'section'
+      json_schema['class'] = details.delete('class') || 'section'
       presets = build_presets(details.delete('presets')) if details.include? 'presets'
       default = build_default(details.delete('default')) if details.include? 'default'
       blocks = build_blocks(details.delete('blocks')) if details.include? 'blocks'
