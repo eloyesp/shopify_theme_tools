@@ -108,34 +108,29 @@ class Schema
 
   def build_settings settings_data
     settings_data.map do |name, details|
-      case details
-      when String
+      if details.kind_of? String
+        details = { 'type' => details }
+      end
+
+      options = build_options details.delete('options')
+      default_type = options.present? ? 'select' : 'text'
+      type = details.delete('type') || default_type
+      case type
+      when 'header'
+        {
+          type: type,
+          content: details['content'] || name.titleize,
+          info: details['info']
+        }
+      else
         {
           id: name,
-          type: details,
+          type: type,
+          **details,
           label: name.titleize,
+          options: options,
         }
-      when Hash
-        options = build_options details.delete('options')
-        default_type = options.present? ? 'select' : 'text'
-        type = details.delete('type') || default_type
-        case type
-        when 'header'
-          {
-            type: type,
-            content: details['content'] || name.titleize,
-            info: details['info']
-          }
-        else
-          {
-            id: name,
-            type: type,
-            **details,
-            label: name.titleize,
-            options: options,
-          }
-        end.compact
-      end
+      end.compact
     end.compact
   end
 
